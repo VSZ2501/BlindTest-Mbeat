@@ -11,6 +11,7 @@ import { RevealScreen } from '@/components/RevealScreen';
 import { Leaderboard } from '@/components/Leaderboard';
 import { YouTubePlayer } from '@/components/YouTubePlayer';
 import { AvatarPicker, randomAvatar, type AvatarConfig } from '@/components/AvatarPicker';
+import { Avatar } from '@/components/Avatar';
 
 export default function RoomPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
@@ -74,7 +75,31 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
               {joinError && <p className="text-center text-sm text-red-400">{joinError}</p>}
             </>
           ) : (
-            <p className="text-center text-zinc-400">La partie a déjà commencé.</p>
+            <div className="flex flex-col gap-3">
+              <p className="text-center text-zinc-400">La partie a déjà commencé.</p>
+              {players.length > 0 && (
+                <>
+                  <p className="text-center text-sm text-zinc-500">
+                    Tu étais dans la partie ? Reprends ta place :
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {players.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          localStorage.setItem(`btmbeat:${code.toUpperCase()}`, p.id);
+                          setMeId(p.id);
+                        }}
+                        className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2 text-left hover:border-cyan-500/60 hover:bg-cyan-500/10"
+                      >
+                        <Avatar color={p.avatar_color} eyes={p.avatar_eyes} mouth={p.avatar_mouth} size={32} />
+                        <span className="truncate text-sm font-medium text-zinc-200">{p.nickname}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
       </Center>

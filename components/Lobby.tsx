@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Avatar } from './Avatar';
 import { parsePlaylistUrl } from '@/lib/youtube';
-import { loadPlaylist, startGame } from '@/lib/game-actions';
+import { loadPlaylist, startGame, kickPlayer } from '@/lib/game-actions';
 import type { Room, Player, PlaylistSong } from '@/lib/types';
 
 interface Props {
@@ -73,6 +73,15 @@ export function Lobby({ room, players, songs, meId }: Props) {
               <div className="relative">
                 <Avatar color={p.avatar_color} eyes={p.avatar_eyes} mouth={p.avatar_mouth} size={48} />
                 {p.is_host && <span className="absolute -right-1 -top-1 text-sm">👑</span>}
+                {isHost && !p.is_host && (
+                  <button
+                    onClick={() => confirm(`Retirer ${p.nickname} ?`) && kickPlayer(p.id)}
+                    className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white hover:bg-red-500"
+                    title="Retirer ce joueur"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
               <span className="w-full truncate text-center text-xs text-zinc-200">
                 {p.nickname}

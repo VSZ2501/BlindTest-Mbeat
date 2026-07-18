@@ -230,3 +230,7 @@ export async function nextRound(roomId: string, currentRound: number) {
     await supabase.from('rooms').update({ status: 'finished' }).eq('id', roomId);
   }
 }
+
+export async function kickPlayer(playerId: string) {
+  await supabase.from('players').delete().eq('id', playerId);
+}
