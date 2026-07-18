@@ -30,9 +30,6 @@ export function BuzzerScreen({ room, players, songs, buzzes, meId }: Props) {
   const iFailed = roundBuzzes.some((b) => b.player_id === meId && b.verdict === 'rejected');
   const hostIsHolder = !!holder && holder.id === room.host_id;
 
-  // Réponse visible par l'hôte : toujours s'il arbitre ; s'il joue,
-  // seulement quand quelqu'un d'autre buzze, ou après avoir cliqué
-  // "Voir la réponse" (bonne foi) quand c'est lui qui tient le buzzer.
   const showTitleToHost =
     isHost &&
     (!room.host_plays || (!!activeBuzz && !hostIsHolder) || (hostIsHolder && showAnswer));
@@ -50,7 +47,7 @@ export function BuzzerScreen({ room, players, songs, buzzes, meId }: Props) {
       setAnswerLeft(left);
       if (left <= 0 && isHost && holder && !judgedRef.current) {
         judgedRef.current = true;
-        judgeBuzz(room, activeBuzz, holder, 'rejected');
+        judgeBuzz(room, activeBuzz, holder, players, 'rejected');
       }
     };
     tick();
@@ -72,7 +69,7 @@ export function BuzzerScreen({ room, players, songs, buzzes, meId }: Props) {
   const judge = (verdict: 'accepted' | 'rejected') => {
     if (!activeBuzz || !holder || judgedRef.current) return;
     judgedRef.current = true;
-    judgeBuzz(room, activeBuzz, holder, verdict);
+    judgeBuzz(room, activeBuzz, holder, players, verdict);
   };
 
   return (
@@ -88,7 +85,7 @@ export function BuzzerScreen({ room, players, songs, buzzes, meId }: Props) {
         <Timer
           startedAt={room.round_started_at!}
           duration={room.round_duration}
-          onExpire={isHost ? () => revealUnanswered(room.id) : undefined}
+          onExpire={isHost ? () => revealUnanswered(room, players) : undefined}
         />
       )}
 
@@ -171,7 +168,7 @@ export function BuzzerScreen({ room, players, songs, buzzes, meId }: Props) {
 
       {roundBuzzes.some((b) => b.verdict === 'rejected') && (
         <p className="text-center text-sm text-zinc-500">
-          Déjà tenté :{' '}
+          Déjà tenté (-1 pt) :{' '}
           {roundBuzzes
             .filter((b) => b.verdict === 'rejected')
             .map((b) => players.find((p) => p.id === b.player_id)?.nickname)
@@ -182,7 +179,7 @@ export function BuzzerScreen({ room, players, songs, buzzes, meId }: Props) {
 
       {isHost && !activeBuzz && (
         <button
-          onClick={() => revealUnanswered(room.id)}
+          onClick={() => revealUnanswered(room, players)}
           className="rounded-xl border border-cyan-500/50 py-2.5 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/10"
         >
           Personne ne trouvera → révéler

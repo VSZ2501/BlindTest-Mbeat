@@ -57,4 +57,5 @@ export interface Buzz {
   player_id: string;
   buzz_order: number;
   verdict: Verdict;
+  created_at: string;
 }

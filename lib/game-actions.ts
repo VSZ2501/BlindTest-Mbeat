@@ -159,10 +159,18 @@ export async function tryBuzz(roomId: string, songId: string, playerId: string) 
   return data as boolean;
 }
 
+async function resetStreaks(players: Player[], exceptId?: string) {
+  const toReset = players.filter((p) => p.id !== exceptId && p.streak > 0);
+  await Promise.all(
+    toReset.map((p) => supabase.from('players').update({ streak: 0 }).eq('id', p.id))
+  );
+}
+
 export async function judgeBuzz(
   room: Room,
   buzz: Buzz,
   player: Player,
+  players: Player[],
   verdict: 'accepted' | 'rejected'
 ) {
   await supabase.from('buzzes').update({ verdict }).eq('id', buzz.id);
@@ -170,7 +178,7 @@ export async function judgeBuzz(
   const d =
     verdict === 'accepted'
       ? acceptedDelta(player, room.streak_enabled)
-      : rejectedBuzzDelta(buzz.buzz_order);
+      : rejectedBuzzDelta();
 
   await supabase
     .from('players')
@@ -178,14 +186,32 @@ export async function judgeBuzz(
     .eq('id', player.id);
 
   if (verdict === 'accepted') {
+    // Streak = manches consécutives réussies : reset des autres joueurs
+    const eligible = players.filter((p) => room.host_plays || !p.is_host);
+    await resetStreaks(eligible, player.id);
     await supabase.from('rooms').update({ status: 'reveal', buzz_deadline: null }).eq('id', room.id);
   } else {
-    await supabase.from('rooms').update({ buzz_deadline: null }).eq('id', room.id);
+    // Temps d'écoute rendu : la manche est décalée de la durée du buzz
+    const pausedMs = Date.now() - new Date(buzz.created_at).getTime();
+    const newStart = new Date(
+      new Date(room.round_started_at!).getTime() + pausedMs
+    ).toISOString();
+    await supabase
+      .from('rooms')
+      .update({ buzz_deadline: null, round_started_at: newStart })
+      .eq('id', room.id);
   }
 }
 
-export async function revealUnanswered(roomId: string) {
-  await supabase.from('rooms').update({ status: 'reveal', buzz_deadline: null }).eq('id', roomId);
+export async function revealUnanswered(room: Room, players: Player[]) {
+  // Personne n'a trouvé : toutes les streaks tombent
+  const eligible = players.filter((p) => room.host_plays || !p.is_host);
+  await resetStreaks(eligible);
+  await supabase.from('rooms').update({ status: 'reveal', buzz_deadline: null }).eq('id', room.id);
+}
+
+export async function pauseBuzzTimer(roomId: string) {
+  await supabase.from('rooms').update({ buzz_deadline: null }).eq('id', roomId);
 }
 
 // ---- FIN DE MANCHE / PARTIE ----
@@ -203,8 +229,4 @@ export async function nextRound(roomId: string, currentRound: number) {
   } else {
     await supabase.from('rooms').update({ status: 'finished' }).eq('id', roomId);
   }
-}
-
-export async function pauseBuzzTimer(roomId: string) {
-  await supabase.from('rooms').update({ buzz_deadline: null }).eq('id', roomId);
 }

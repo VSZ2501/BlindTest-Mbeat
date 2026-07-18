@@ -19,6 +19,7 @@ export function RevealScreen({ room, players, songs, meId, prevScores }: Props) 
   const isHost = room.host_id === meId;
   const isLast = room.current_round + 1 >= songs.length;
   const board = players.filter((p) => room.host_plays || !p.is_host);
+  const next = songs.find((s) => s.play_order === room.current_round + 1);
 
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-6">
@@ -37,6 +38,14 @@ export function RevealScreen({ room, players, songs, meId, prevScores }: Props) 
       </div>
 
       <Leaderboard players={board} meId={meId} prevScores={prevScores} streakEnabled={room.streak_enabled} />
+
+      {isHost && next && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-center text-sm">
+          <span className="text-zinc-400">Prochaine musique (visible par toi seul) : </span>
+          <span className="font-semibold text-amber-300">{next.title}</span>
+          {next.channel && <span className="text-zinc-400"> — {next.channel}</span>}
+        </div>
+      )}
 
       {isHost && (
         <button
