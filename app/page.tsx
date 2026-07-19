@@ -102,7 +102,7 @@ export default function Home() {
               onChange={(e) => setSongsTotal(Number(e.target.value))}
               className="rounded-lg border border-white/10 bg-zinc-900 px-2 py-1"
             >
-              {[5, 10, 15, 20, 25, 30, 40, 50].map((n) => (
+              {[5, 10, 15, 20, 25, 30, 40, 50, 75, 100].map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>
