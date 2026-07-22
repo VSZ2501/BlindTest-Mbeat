@@ -234,3 +234,8 @@ export async function nextRound(roomId: string, currentRound: number) {
 export async function kickPlayer(playerId: string) {
   await supabase.from('players').delete().eq('id', playerId);
 }
+
+export async function cancelBuzz(roomId: string, buzzId: string) {
+  await supabase.from('buzzes').delete().eq('id', buzzId);
+  await supabase.from('rooms').update({ buzz_deadline: null }).eq('id', roomId);
+}

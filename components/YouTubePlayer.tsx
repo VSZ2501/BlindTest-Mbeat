@@ -22,6 +22,39 @@ function loadYouTubeAPI(): Promise<void> {
   return apiPromise;
 }
 
+// WAV silencieux généré à la volée (masque les métadonnées YouTube
+// dans les contrôles média du système — best effort selon navigateur)
+function silentWavUrl(seconds = 2): string {
+  const rate = 8000;
+  const n = rate * seconds;
+  const buf = new ArrayBuffer(44 + n);
+  const v = new DataView(buf);
+  const w = (o: number, s: string) => {
+    for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i));
+  };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate, true);
+  v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+  w(36, 'data'); v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+
+function maskMediaSession(audio: HTMLAudioElement | null) {
+  if (!audio || !('mediaSession' in navigator)) return;
+  audio.play().catch(() => {});
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: 'Musique mystère 🎵',
+      artist: 'BlindTest-Mbeat',
+    });
+    for (const a of ['play', 'pause', 'nexttrack', 'previoustrack'] as const) {
+      navigator.mediaSession.setActionHandler(a, () => {});
+    }
+  } catch {}
+}
+
 interface Props {
   videoId: string;
   paused?: boolean;
@@ -30,12 +63,24 @@ interface Props {
 export function YouTubePlayer({ videoId, paused = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const pausedRef = useRef(paused);
   const [volume, setVolume] = useState(70);
   const [blocked, setBlocked] = useState(false);
   const [ready, setReady] = useState(false);
 
   pausedRef.current = paused;
+
+  useEffect(() => {
+    const audio = new Audio(silentWavUrl());
+    audio.loop = true;
+    audio.volume = 0.01;
+    audioRef.current = audio;
+    return () => {
+      audio.pause();
+      audioRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     let destroyed = false;
@@ -63,13 +108,16 @@ export function YouTubePlayer({ videoId, paused = false }: Props) {
             e.target.setVolume(volume);
             e.target.playVideo();
             setReady(true);
-            // Détection multi-passes : mobile bloque souvent au-delà de 1,5s
             timers.push(setTimeout(checkBlocked, 800));
             timers.push(setTimeout(checkBlocked, 2000));
             timers.push(setTimeout(checkBlocked, 4000));
           },
           onStateChange: (e: any) => {
-            if (e.data === window.YT.PlayerState.PLAYING) setBlocked(false);
+            if (e.data === window.YT.PlayerState.PLAYING) {
+              setBlocked(false);
+              // Reprend le focus média après le démarrage de YouTube
+              timers.push(setTimeout(() => maskMediaSession(audioRef.current), 400));
+            }
           },
         },
       });
@@ -95,9 +143,9 @@ export function YouTubePlayer({ videoId, paused = false }: Props) {
   }, [volume]);
 
   const unlock = () => {
-    // Geste utilisateur : débloque l'audio pour toute la suite de la partie
     playerRef.current?.setVolume?.(volume);
     playerRef.current?.playVideo?.();
+    maskMediaSession(audioRef.current);
   };
 
   return (

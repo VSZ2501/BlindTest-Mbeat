@@ -3,21 +3,28 @@
 import { useEffect, useRef, useState } from 'react';
 import { Timer } from './Timer';
 import { Avatar } from './Avatar';
-import { tryBuzz, judgeBuzz, revealUnanswered, pauseBuzzTimer } from '@/lib/game-actions';
+import { tryBuzz, judgeBuzz, revealUnanswered, pauseBuzzTimer, cancelBuzz } from '@/lib/game-actions';
 import type { Room, Player, PlaylistSong, Buzz } from '@/lib/types';
 
-interface Props {
+const ARM_DELAY_MS = 1500;
+
+export function BuzzerScreen({
+  room,
+  players,
+  songs,
+  buzzes,
+  meId,
+}: {
   room: Room;
   players: Player[];
   songs: PlaylistSong[];
   buzzes: Buzz[];
   meId: string;
-}
-
-export function BuzzerScreen({ room, players, songs, buzzes, meId }: Props) {
+}) {
   const [pending, setPending] = useState(false);
   const [answerLeft, setAnswerLeft] = useState(10);
   const [showAnswer, setShowAnswer] = useState(false);
+  const [armed, setArmed] = useState(false);
   const judgedRef = useRef(false);
 
   const isHost = room.host_id === meId;
@@ -39,6 +46,16 @@ export function BuzzerScreen({ room, players, songs, buzzes, meId }: Props) {
     setShowAnswer(false);
   }, [activeBuzz?.id, songId]);
 
+  // Armement : le buzzer est verrouillé 1,5s après chaque (re)départ de
+  // manche — absorbe les clics en attente, souris posée sur le bouton, etc.
+  useEffect(() => {
+    setArmed(false);
+    if (!room.round_started_at) return;
+    const elapsed = Date.now() - new Date(room.round_started_at).getTime();
+    const t = setTimeout(() => setArmed(true), Math.max(0, ARM_DELAY_MS - elapsed));
+    return () => clearTimeout(t);
+  }, [room.round_started_at, songId]);
+
   // Chrono 10s de réponse orale (gelé si buzz_deadline est null)
   useEffect(() => {
     if (!activeBuzz || !room.buzz_deadline) return;
@@ -56,8 +73,10 @@ export function BuzzerScreen({ room, players, songs, buzzes, meId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBuzz?.id, room.buzz_deadline, isHost]);
 
-  const buzz = async () => {
-    if (pending || activeBuzz || iFailed || !iPlay) return;
+  const buzz = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (e.detail === 0) return; // clic clavier (Entrée/Espace) ignoré
+    e.currentTarget.blur();
+    if (pending || activeBuzz || iFailed || !iPlay || !armed) return;
     setPending(true);
     try {
       await tryBuzz(room.id, songId, meId);
@@ -70,6 +89,12 @@ export function BuzzerScreen({ room, players, songs, buzzes, meId }: Props) {
     if (!activeBuzz || !holder || judgedRef.current) return;
     judgedRef.current = true;
     judgeBuzz(room, activeBuzz, holder, players, verdict);
+  };
+
+  const cancel = () => {
+    if (!activeBuzz || judgedRef.current) return;
+    judgedRef.current = true;
+    cancelBuzz(room.id, activeBuzz.id);
   };
 
   return (
@@ -147,20 +172,28 @@ export function BuzzerScreen({ room, players, songs, buzzes, meId }: Props) {
                   ✗ Raté
                 </button>
               </div>
+              <button
+                onClick={cancel}
+                className="rounded-xl border border-zinc-500/40 py-2 text-xs font-semibold text-zinc-400 hover:bg-white/5"
+              >
+                ↩ Buzz accidentel (annuler, sans malus)
+              </button>
             </div>
           )}
         </div>
       ) : iPlay ? (
         <button
           onClick={buzz}
-          disabled={iFailed || pending}
+          disabled={iFailed || pending || !armed}
           className={`mx-auto flex h-52 w-52 items-center justify-center rounded-full border-8 text-2xl font-black transition active:scale-95 ${
             iFailed
               ? 'border-zinc-700 bg-zinc-800 text-zinc-600'
+              : !armed
+              ? 'border-zinc-600 bg-zinc-700 text-zinc-400'
               : 'border-red-700 bg-red-600 text-white shadow-2xl shadow-red-500/30 hover:bg-red-500'
           }`}
         >
-          {iFailed ? 'Déjà tenté 😅' : 'BUZZ !'}
+          {iFailed ? 'Déjà tenté 😅' : !armed ? '🔒' : 'BUZZ !'}
         </button>
       ) : (
         <p className="text-center text-zinc-400">En attente d'un buzz… 🎧</p>
