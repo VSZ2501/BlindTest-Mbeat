@@ -48,6 +48,7 @@ export interface Answer {
   player_id: string;
   text: string;
   verdict: Verdict;
+  points: number | null;
 }
 
 export interface Buzz {

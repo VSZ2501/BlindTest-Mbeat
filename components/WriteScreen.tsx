@@ -62,6 +62,10 @@ export function WriteScreen({ room, players, answers, meId }: Props) {
           <p className="text-center text-xs text-zinc-500">
             Tu peux corriger et revalider jusqu'à la fin du chrono.
           </p>
+          <p className="text-center text-xs text-zinc-500">
+            Plus tu es précise, plus tu marques : 1 pt si tu reconnais l'univers, 2 si tu
+            précises l'œuvre, 3 pour le titre exact. Mais −1 si c'est faux !
+          </p>
         </div>
       ) : (
         <p className="text-center text-zinc-400">Les joueurs écrivent leur réponse… 🎧</p>

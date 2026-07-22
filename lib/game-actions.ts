@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { acceptedDelta, rejectedWriteDelta, rejectedBuzzDelta } from './scoring';
+import { writeDelta, acceptedDelta, rejectedBuzzDelta } from './scoring';
 import type { Room, Player, PlaylistSong, Answer, Buzz, GameMode } from './types';
 import type { AvatarConfig } from '@/components/AvatarPicker';
 
@@ -122,8 +122,11 @@ export async function openJudging(roomId: string) {
   await supabase.from('rooms').update({ status: 'judging' }).eq('id', roomId);
 }
 
-export async function setVerdict(answerId: string, verdict: 'accepted' | 'rejected') {
-  await supabase.from('answers').update({ verdict }).eq('id', answerId);
+export async function setPoints(answerId: string, points: number) {
+  await supabase
+    .from('answers')
+    .update({ points, verdict: points >= 1 ? 'accepted' : 'rejected' })
+    .eq('id', answerId);
 }
 
 export async function finishJudging(room: Room, players: Player[], answers: Answer[]) {
@@ -133,10 +136,8 @@ export async function finishJudging(room: Room, players: Player[], answers: Answ
   await Promise.all(
     eligible.map((p) => {
       const a = roundAnswers.find((x) => x.player_id === p.id);
-      const d =
-        a?.verdict === 'accepted'
-          ? acceptedDelta(p, room.streak_enabled)
-          : rejectedWriteDelta();
+      const hasText = !!a?.text.trim();
+      const d = writeDelta(p, hasText ? a!.points : 0, room.streak_enabled);
       return supabase
         .from('players')
         .update({ score: p.score + d.points, streak: d.streak })
